@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="css/reset.css">
+<link rel="stylesheet" href="css/style.css">
+<title>Chatアプリ</title>
+</head>
+<body>
+
+<!-- コンテンツ表示画面 -->
+<div>
+  <div class="input">
+    <ul class="icon_list">
+      <li class="imgs" data-img="0" id="buke"><img src= "imgs/buke.png" width="70"></li>
+      <li class="imgs" data-img="1" id="tuku"><img src= "imgs/tuku.jpg" width="70"></li>
+      <li class="imgs" data-img="2" id="caram"><img src= "imgs/caram.png" width="70"></li>
+    </ul>
+      <div class="name_mic">Name：<input type="text" id="uname">
+      <img src="imgs/mic.png" id="sound" class="mic"></div>
+      <textarea id="text" rows="10"></textarea>
+      <button id="send">送信</button>
+      </ul>
+  </div>
+    <div id="output" class="output" style="height:280px; overflow: auto"></div>
+</div>
+<p class="clear" id="clear">トークを全削除</p>
+
+<!--/ コンテンツ表示画面 -->
+
+
+
+<!-- JQuery -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<!-- JQuery -->
+
+
+<!--** 以下Firebase **-->
+<!-- The core Firebase JS SDK is always required and must be listed first -->
+<script src="https://www.gstatic.com/firebasejs/7.20.0/firebase.js"></script>
+
+<!-- TODO: Add SDKs for Firebase products that you want to use
+     https://firebase.google.com/docs/web/setup#available-libraries -->
+
+<script>
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+    //.ref()=ユニークkeyを自動で振ってください ()の中に値を入れるとkeyを指定できる  
+    const ref = firebase.database().ref(); 
+</script>
+
+<script>
+
+// アイコン処理
+let d =3;
+const img = ["buke.png", "tuku.jpg", "caram.png"];
+$(".imgs").on("click", function(){
+  // クリックした画像のdata-imgの数値を取得する
+  d= $(this).attr("data-img");
+});
+
+// localstorageから以前使った名前とアイコンを出す
+for (let index = 0; index < localStorage.length; index++) {
+    // ローカルストレージのkeyのindex番目の中身を取得
+    const key = localStorage.key(index);
+    // keyに対応するvalueも取得
+    const value = localStorage.getItem(key);
+    if (value==0 || value==1 ||value==2) {
+      const uname = localStorage.key(index);
+      $("#uname").val(uname);
+      d = localStorage.getItem(key);
+    }
+  }
+if (d==0) {
+  $(".imgs").addClass("unselected");
+  $("#buke").addClass("selected");
+} if(d==1) {
+  $(".imgs").addClass("unselected");
+  $("#tuku").addClass("selected");
+} if(d==2) {
+  $(".imgs").addClass("unselected");
+  $("#caram").addClass("selected");
+}
+
+// クリックイベント（アイコン表示）
+$(".imgs").on("click",function(){
+  $(".imgs").addClass("unselected");
+  $(".imgs").removeClass("selected");
+  $(this).addClass("selected");
+});
+
+// 時間取得
+let now = new Date();            //日付取得準備（必須）！！
+  let m = ("0"+(now.getMonth() + 1)).slice(-2);    //月（2桁表示）
+  let day =  ("0"+now.getDate()).slice(-2);  //日（2桁表示）
+  let h = ("0"+now.getHours()).slice(-2);          //時（2桁表示）
+  let mi = ("0"+now.getMinutes()).slice(-2);        //分（2桁表示）
+
+  //日時表示文字列の作成(その他の時間の表示に合わせる)
+  let t = m + "-" + day + " "+ h + ":" + mi ;
+
+// 音声入力
+let speech = new webkitSpeechRecognition();
+$("#sound").on("click",function(){
+  speech.start();
+  $("#text").val("音声入力を受け付けています・・・");
+  speech.onresult = function (e) {
+  speech.stop();      
+    if (e.results[0].isFinal) {
+      $("#text").val(e.results[0][0].transcript);
+    }
+  };
+});
+
+//関数定義
+function send(){
+    const uname = $("#uname").val();
+    const text = $("#text").val();
+    const time = t;
+    const msg={
+        uname: uname,
+        text: text,
+        time: time,
+        icon: d
+    }
+    // アイコン、名前、テキスト入力がなかったらアラート
+    if (d==3) {
+      alert("アイコンを選択してください");
+      return false;
+    }
+    if (uname=="") {
+      alert("名前を入力してください");
+      return false;
+    }
+    if (text=="") {
+      alert("メッセージを入力してください");
+      return false;
+    }
+    ref.push(msg); //set=決まった名前、push=ユニーク
+    // スクロール
+    $('#output').animate({scrollTop: $('#output')[0].scrollHeight}, 'fast');
+    $("#text").val("");
+    // keyを名前、valueをアイコンにしてlocalstorageに保存する
+    // （同じユーザーが入ったときに名前とアイコンの入力を省く）
+    for (let index = 0; index < localStorage.length; index++) {
+    // ローカルストレージのkeyのindex番目の中身を取得
+    const key = localStorage.key(index);
+    // keyに対応するvalueも取得
+    const value = localStorage.getItem(key);
+    if (value==0 || value==1 ||value==2) {
+      localStorage.removeItem(key);
+    }
+  }
+    localStorage.setItem(uname, msg.icon);
+}
+
+// 文字を送信
+  $("#send").on("click", function(){
+    send();
+  });
+
+// 受信処理
+ref.on("child_added", function(data){
+    const v = data.val();  //送信されたオブジェクトを取得
+    const k = data.key;  //ユニークキーの取得
+    const h = '<div class="output_icon"><img src="imgs/'+img[v.icon]+'" width="50"><p>' +v.uname + '</p></div><div class="output_text" key="'+ k +'"><p>' + v.text + '</p></div><span class="output_time">' + v.time + '</span>';
+    $("#output").append( h );
+    // // 削除
+    $(".output_text").on("click",function(){
+    if(!confirm("メッセージを削除してよろしいですか？")){
+      return false;
+    }else{
+      const d_key =$(this).attr("key");
+      ref.child(d_key).remove();
+      location.reload();
+    }
+    // lineみたいに削除履歴が残って、デザインが変わるようにしたかった
+    // （削除履歴は残せるが、デザインを変えられない・・・）
+    // if(!confirm("メッセージを削除してよろしいですか？")){
+    //   return false;
+    // }else{
+    //   const d_text ="----メッセージは削除されました----";
+    //   const d_key =$(this).attr("key");
+    //   const deleted = '<p>' + d_text + '</p>';
+    //   $(this).html(deleted);
+    //   //このkeyのvalueを取得
+    //   ref.child(d_key).on('value',function(data) {
+    //     const d_v = data.val();
+    //     // valueを書き換え
+    //     const d_msg={
+    //     uname: d_v.uname,
+    //     text: d_text,
+    //     time: d_v.time,
+    //     icon: d_v.icon
+    //     }
+    //   ref.child(d_key).set(d_msg);
+    //   });
+    // // }
+    });
+});
+
+// イベント情報取得
+$("#text").on("keydown", function(e){
+    // console.log(e);
+    if(e.keyCode == 13){
+      send();
+    }
+});
+
+// clear
+$("#clear").on("click", function(){
+  if(!confirm("トーク履歴を全て削除してよろしいですか？")){
+        return false;
+    }else{
+    location.reload();
+    alert("削除しました");
+    ref.set({})
+    }
+});
+    
+
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
